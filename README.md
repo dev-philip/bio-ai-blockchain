@@ -8,7 +8,7 @@ This program provides functionality to:
 - Create organizations
 - Manage organization membership
 - Add claims to organizations
-- Retrieve claims from organizations
+- Retrieve claims from organizations (members only)
 
 ## Deployment Information
 
@@ -60,6 +60,9 @@ Allows existing organization members to add new members.
 ### Add Claim
 Allows organization members to add claims to their organization.
 
+### Get Claims
+Retrieves all claims for an organization. Only organization members can access the claims.
+
 ## Error Handling
 
 The program includes comprehensive error handling for various scenarios:
@@ -78,6 +81,7 @@ The program includes extensive tests covering:
 - Member management
 - Claim management
 - Error cases and edge conditions
+- Claim retrieval authorization
 
 ## Security Considerations
 
@@ -85,6 +89,7 @@ The program includes extensive tests covering:
 - Unique member public keys
 - Claim validation
 - Organization name validation
+- Protected claim retrieval
 
 ## Limitations
 
@@ -100,6 +105,8 @@ The program includes extensive tests covering:
 - Add claim update and deletion
 - Add organization update functionality
 - Implement dynamic capacity for members and claims
+- Add pagination for claim retrieval
+- Add claim filtering options
 
 ## Getting Started
 
@@ -134,6 +141,17 @@ To interact with the deployed program on devnet:
 3. Use the program ID in your client code:
    ```typescript
    const programId = new PublicKey("DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9");
+   ```
+
+4. Example of retrieving claims:
+   ```typescript
+   const claims = await program.methods
+     .getClaims(organizationName)
+     .accounts({
+       programData: programDataPDA,
+       requester: wallet.publicKey,
+     })
+     .view();
    ```
 
 ## License

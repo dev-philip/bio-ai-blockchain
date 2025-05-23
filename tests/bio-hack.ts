@@ -48,9 +48,9 @@ describe("bio-hack", () => {
         })
         .rpc();
 
-      console.log("Initialize transaction:", tx);
+      // console.log("Initialize transaction:", tx);
       const programData = await program.account.programData.fetch(programDataPDA);
-      console.log("Program data after initialization:", programData);
+      // console.log("Program data after initialization:", programData);
       expect(programData.organizations).to.be.an("array").that.is.empty;
     });
 
@@ -66,7 +66,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on second initialization:", err);
+        // console.log("Expected error on second initialization:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -82,9 +82,9 @@ describe("bio-hack", () => {
         })
         .rpc();
 
-      console.log("Create organization transaction:", tx);
+      // console.log("Create organization transaction:", tx);
       const programData = await program.account.programData.fetch(programDataPDA);
-      console.log("Program data after organization creation:", programData);
+      // console.log("Program data after organization creation:", programData);
       const org = programData.organizations[0];
       expect(org.name).to.equal(testOrgName);
       expect(org.creator.equals(wallet.publicKey)).to.be.true;
@@ -104,7 +104,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on duplicate organization:", err);
+        // console.log("Expected error on duplicate organization:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -120,7 +120,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on empty organization name:", err);
+        // console.log("Expected error on empty organization name:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -135,13 +135,13 @@ describe("bio-hack", () => {
             creator: wallet.publicKey,
           })
           .rpc();
-        console.log(`Create organization ${name} transaction:`, tx);
+        // console.log(`Create organization ${name} transaction:`, tx);
       }
 
       const programData = await program.account.programData.fetch(programDataPDA);
-      console.log("Program data after creating multiple organizations:", programData);
-      console.log("Number of organizations:", programData.organizations.length);
-      console.log("Organization names:", programData.organizations.map(org => org.name));
+      // console.log("Program data after creating multiple organizations:", programData);
+      // console.log("Number of organizations:", programData.organizations.length);
+      // console.log("Organization names:", programData.organizations.map(org => org.name));
       expect(programData.organizations).to.have.lengthOf(4); // Including TestOrg
       expect(programData.organizations.map(org => org.name)).to.include.members(orgNames);
     });
@@ -163,9 +163,9 @@ describe("bio-hack", () => {
         })
         .rpc();
 
-      console.log("Add member transaction:", tx);
+      // console.log("Add member transaction:", tx);
       const programData = await program.account.programData.fetch(programDataPDA);
-      console.log("Program data after adding member:", programData);
+      // console.log("Program data after adding member:", programData);
       const org = programData.organizations.find(o => o.name === testOrgName);
       expect(org.members).to.have.lengthOf(2);
       expect(org.members[1].equals(newMember.publicKey)).to.be.true;
@@ -182,7 +182,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on duplicate member:", err);
+        // console.log("Expected error on duplicate member:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -198,7 +198,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on non-existent organization:", err);
+        // console.log("Expected error on non-existent organization:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -218,7 +218,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on unauthorized member addition:", err);
+        // console.log("Expected error on unauthorized member addition:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -234,14 +234,14 @@ describe("bio-hack", () => {
         })
         .rpc();
 
-      console.log("Add claim transaction:", tx);
+      // console.log("Add claim transaction:", tx);
       const programData = await program.account.programData.fetch(programDataPDA);
-      console.log("Program data after adding claim:", programData);
+      // console.log("Program data after adding claim:", programData);
       const org = programData.organizations.find(o => o.name === testOrgName);
-      console.log("Organization claims:", org.claims);
-      console.log("First claim:", org.claims[0]);
-      console.log("Created at type:", typeof org.claims[0].createdAt);
-      console.log("Created at value:", org.claims[0].createdAt);
+      // console.log("Organization claims:", org.claims);
+      // console.log("First claim:", org.claims[0]);
+      // console.log("Created at type:", typeof org.claims[0].createdAt);
+      // console.log("Created at value:", org.claims[0].createdAt);
       expect(org.claims).to.have.lengthOf(1);
       expect(org.claims[0].claimId).to.equal(testClaimId);
       expect(org.claims[0].jsonUrl).to.equal(testJsonUrl);
@@ -261,7 +261,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on duplicate claim:", err);
+        // console.log("Expected error on duplicate claim:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -277,7 +277,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on non-existent organization:", err);
+        // console.log("Expected error on non-existent organization:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -297,7 +297,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on unauthorized claim addition:", err);
+        // console.log("Expected error on unauthorized claim addition:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -316,13 +316,13 @@ describe("bio-hack", () => {
             creator: wallet.publicKey,
           })
           .rpc();
-        console.log(`Add claim ${claim.id} transaction:`, tx);
+        // console.log(`Add claim ${claim.id} transaction:`, tx);
       }
 
       const programData = await program.account.programData.fetch(programDataPDA);
-      console.log("Program data after adding multiple claims:", programData);
+      // console.log("Program data after adding multiple claims:", programData);
       const org = programData.organizations.find(o => o.name === testOrgName);
-      console.log("Organization claims:", org.claims);
+      // console.log("Organization claims:", org.claims);
       expect(org.claims).to.have.lengthOf(3);
       expect(org.claims.map(c => c.claimId)).to.include.members(claims.map(c => c.id));
     });
@@ -338,7 +338,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on empty claim ID:", err);
+        // console.log("Expected error on empty claim ID:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -354,7 +354,7 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on empty URL:", err);
+        // console.log("Expected error on empty URL:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });
@@ -371,7 +371,61 @@ describe("bio-hack", () => {
           .rpc();
         expect.fail("Should have thrown an error");
       } catch (err) {
-        console.log("Expected error on invalid hash length:", err);
+        // console.log("Expected error on invalid hash length:", err);
+        expect(err).to.be.instanceOf(Error);
+      }
+    });
+
+    it("Retrieves claims successfully for organization member", async () => {
+      const claims = await program.methods
+        .getClaims(testOrgName)
+        .accounts({
+          programData: programDataPDA,
+          requester: wallet.publicKey,
+        })
+        .view();
+
+      console.log("Retrieved claims:", claims);
+      expect(claims).to.be.an("array");
+      expect(claims).to.have.lengthOf(3); // We added 3 claims in previous tests
+      expect(claims[0].claimId).to.equal(testClaimId);
+      expect(claims[0].jsonUrl).to.equal(testJsonUrl);
+      expect(claims[0].dataHash).to.deep.equal(testDataHash);
+      expect(claims[0].creator.equals(wallet.publicKey)).to.be.true;
+      expect(claims[0].createdAt.toNumber()).to.be.a("number");
+    });
+
+    it("Fails to retrieve claims for non-member", async () => {
+      const nonMember = createWallet();
+      await airdrop(nonMember, 1);
+
+      try {
+        await program.methods
+          .getClaims(testOrgName)
+          .accounts({
+            programData: programDataPDA,
+            requester: nonMember.publicKey,
+          })
+          .view();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        console.log("Expected error on unauthorized claim retrieval:", err);
+        expect(err).to.be.instanceOf(Error);
+      }
+    });
+
+    it("Fails to retrieve claims for non-existent organization", async () => {
+      try {
+        await program.methods
+          .getClaims("NonExistentOrg")
+          .accounts({
+            programData: programDataPDA,
+            requester: wallet.publicKey,
+          })
+          .view();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        console.log("Expected error on non-existent organization:", err);
         expect(err).to.be.instanceOf(Error);
       }
     });

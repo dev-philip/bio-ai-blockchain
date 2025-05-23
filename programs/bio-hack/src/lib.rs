@@ -59,6 +59,9 @@ pub mod bio_hack {
         json_url: String,
         data_hash: [u8; 32],
     ) -> Result<()> {
+        require!(!claim_id.is_empty(), ErrorCode::InvalidClaimId);
+        require!(!json_url.is_empty(), ErrorCode::InvalidJsonUrl);
+        
         let program_data = &mut ctx.accounts.program_data;
         let organization = program_data.organizations
             .iter_mut()
@@ -82,6 +85,24 @@ pub mod bio_hack {
             created_at: Clock::get()?.unix_timestamp,
         });
         Ok(())
+    }
+
+    pub fn get_claims(
+        ctx: Context<GetClaims>,
+        organization_name: String,
+    ) -> Result<Vec<Claim>> {
+        let program_data = &ctx.accounts.program_data;
+        let organization = program_data.organizations
+            .iter()
+            .find(|org| org.name == organization_name)
+            .ok_or(ErrorCode::OrganizationNotFound)?;
+
+        require!(
+            organization.members.contains(ctx.accounts.requester.key),
+            ErrorCode::Unauthorized
+        );
+
+        Ok(organization.claims.clone())
     }
 }
 
@@ -124,6 +145,13 @@ pub struct AddClaim<'info> {
     pub creator: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct GetClaims<'info> {
+    pub program_data: Account<'info, ProgramData>,
+    /// CHECK: This is the account requesting the claims
+    pub requester: AccountInfo<'info>,
+}
+
 #[account]
 pub struct ProgramData {
     pub organizations: Vec<Organization>,
@@ -160,4 +188,8 @@ pub enum ErrorCode {
     OrganizationAlreadyExists,
     #[msg("Organization name cannot be empty")]
     InvalidOrganizationName,
+    #[msg("Claim ID cannot be empty")]
+    InvalidClaimId,
+    #[msg("JSON URL cannot be empty")]
+    InvalidJsonUrl,
 }
