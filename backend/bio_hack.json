@@ -1,0 +1,337 @@
+{
+  "address": "DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9",
+  "metadata": {
+    "name": "bio_hack",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "program_data",
+          "writable": true
+        },
+        {
+          "name": "new_owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "add_claim",
+      "discriminator": [
+        70,
+        114,
+        85,
+        106,
+        66,
+        244,
+        46,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "program_data",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "claim_id",
+          "type": "string"
+        },
+        {
+          "name": "json_url",
+          "type": "string"
+        },
+        {
+          "name": "data_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_claims",
+      "discriminator": [
+        137,
+        77,
+        151,
+        53,
+        39,
+        5,
+        110,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [],
+      "returns": {
+        "vec": {
+          "defined": {
+            "name": "Claim"
+          }
+        }
+      }
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "program_data",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "initial_owner",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "renounce_ownership",
+      "discriminator": [
+        19,
+        143,
+        91,
+        79,
+        34,
+        168,
+        174,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "program_data",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "program_data",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ProgramData",
+      "discriminator": [
+        211,
+        243,
+        91,
+        186,
+        23,
+        190,
+        190,
+        4
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the owner can perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "ClaimAlreadyExists",
+      "msg": "Claim with this ID already exists"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidClaimId",
+      "msg": "Claim ID cannot be empty"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidJsonUrl",
+      "msg": "JSON URL cannot be empty"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidNewOwner",
+      "msg": "Invalid new owner address"
+    },
+    {
+      "code": 6005,
+      "name": "NoPendingOwnershipTransfer",
+      "msg": "No pending ownership transfer"
+    }
+  ],
+  "types": [
+    {
+      "name": "Claim",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim_id_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "json_url",
+            "type": "string"
+          },
+          {
+            "name": "data_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_owner",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "claims",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Claim"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,433 +1,153 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { BioHack } from "../target/types/bio_hack";
+import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { BN } from "bn.js";
 
 describe("bio-hack", () => {
+  // Configure the client to use the local cluster
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.BioHack as Program<BioHack>;
-  const wallet = provider.wallet;
-
+  
+  // Test accounts
+  const owner = Keypair.generate();
+  const newOwner = Keypair.generate();
+  const unauthorized = Keypair.generate();
+  
   // Program data PDA
-  const [programDataPDA] = PublicKey.findProgramAddressSync(
+  const [programDataPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("program_data")],
     program.programId
   );
 
   // Test data
-  const testOrgName = "TestOrg";
-  const testClaimId = "claim-1";
+  const testClaimId = "test_claim_1";
   const testJsonUrl = "https://example.com/claim.json";
-  const testDataHash = Array.from(new Uint8Array(32).fill(1)); // Convert to number array
+  const testDataHash = Array(32).fill(1); // Example 32-byte hash as number array
 
-  // Helper function to create a new wallet
-  const createWallet = () => {
-    return anchor.web3.Keypair.generate();
-  };
-
-  // Helper function to airdrop SOL to a wallet
-  const airdrop = async (wallet: anchor.web3.Keypair, amount: number) => {
+  before(async () => {
+    // Airdrop SOL to owner
     const signature = await provider.connection.requestAirdrop(
-      wallet.publicKey,
-      amount * anchor.web3.LAMPORTS_PER_SOL
+      owner.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
     );
     await provider.connection.confirmTransaction(signature);
-  };
 
-  describe("Program Initialization", () => {
-    it("Initializes program data account", async () => {
-      const tx = await program.methods
-        .initialize()
-        .accounts({
-          programData: programDataPDA,
-          creator: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+    // Initialize program with owner
+    await program.methods
+      .initialize(owner.publicKey)
+      .accounts({
+        programData: programDataPda,
+        creator: owner.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([owner])
+      .rpc();
 
-      // console.log("Initialize transaction:", tx);
-      const programData = await program.account.programData.fetch(programDataPDA);
-      // console.log("Program data after initialization:", programData);
-      expect(programData.organizations).to.be.an("array").that.is.empty;
-    });
-
-    it("Fails to initialize program data account twice", async () => {
-      try {
-        await program.methods
-          .initialize()
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-            systemProgram: SystemProgram.programId,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on second initialization:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
+    // Verify initialization
+    const programData = await program.account.programData.fetch(programDataPda);
+    expect(programData.owner.toString()).to.equal(owner.publicKey.toString());
+    expect(programData.claims.length).to.equal(0);
   });
 
-  describe("Organization Management", () => {
-    it("Creates organization successfully", async () => {
-      const tx = await program.methods
-        .createOrganization(testOrgName)
-        .accounts({
-          programData: programDataPDA,
-          creator: wallet.publicKey,
-        })
-        .rpc();
+  it("Adds and retrieves claims", async () => {
+    // Add claim
+    await program.methods
+      .addClaim(testClaimId, testJsonUrl, testDataHash)
+      .accounts({
+        programData: programDataPda,
+        creator: owner.publicKey,
+      })
+      .signers([owner])
+      .rpc();
 
-      // console.log("Create organization transaction:", tx);
-      const programData = await program.account.programData.fetch(programDataPDA);
-      // console.log("Program data after organization creation:", programData);
-      const org = programData.organizations[0];
-      expect(org.name).to.equal(testOrgName);
-      expect(org.creator.equals(wallet.publicKey)).to.be.true;
-      expect(org.members).to.have.lengthOf(1);
-      expect(org.members[0].equals(wallet.publicKey)).to.be.true;
-      expect(org.claims).to.be.an("array").that.is.empty;
-    });
-
-    it("Fails to create organization with duplicate name", async () => {
-      try {
-        await program.methods
-          .createOrganization(testOrgName)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on duplicate organization:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Fails to create organization with empty name", async () => {
-      try {
-        await program.methods
-          .createOrganization("")
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on empty organization name:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Creates multiple organizations successfully", async () => {
-      const orgNames = ["Org1", "Org2", "Org3"];
-      for (const name of orgNames) {
-        const tx = await program.methods
-          .createOrganization(name)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        // console.log(`Create organization ${name} transaction:`, tx);
-      }
-
-      const programData = await program.account.programData.fetch(programDataPDA);
-      // console.log("Program data after creating multiple organizations:", programData);
-      // console.log("Number of organizations:", programData.organizations.length);
-      // console.log("Organization names:", programData.organizations.map(org => org.name));
-      expect(programData.organizations).to.have.lengthOf(4); // Including TestOrg
-      expect(programData.organizations.map(org => org.name)).to.include.members(orgNames);
-    });
+    // Get claims
+    const programData = await program.account.programData.fetch(programDataPda);
+    expect(programData.claims.length).to.equal(1);
+    expect(programData.claims[0].jsonUrl).to.equal(testJsonUrl);
   });
 
-  describe("Member Management", () => {
-    const newMember = createWallet();
-
-    before(async () => {
-      await airdrop(newMember, 1);
-    });
-
-    it("Adds member successfully", async () => {
-      const tx = await program.methods
-        .addMember(testOrgName, newMember.publicKey)
+  it("Prevents duplicate claims", async () => {
+    try {
+      // Try to add duplicate claim
+      await program.methods
+        .addClaim(testClaimId, testJsonUrl, testDataHash)
         .accounts({
-          programData: programDataPDA,
-          creator: wallet.publicKey,
+          programData: programDataPda,
+          creator: owner.publicKey,
         })
+        .signers([owner])
         .rpc();
-
-      // console.log("Add member transaction:", tx);
-      const programData = await program.account.programData.fetch(programDataPDA);
-      // console.log("Program data after adding member:", programData);
-      const org = programData.organizations.find(o => o.name === testOrgName);
-      expect(org.members).to.have.lengthOf(2);
-      expect(org.members[1].equals(newMember.publicKey)).to.be.true;
-    });
-
-    it("Fails to add duplicate member", async () => {
-      try {
-        await program.methods
-          .addMember(testOrgName, newMember.publicKey)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on duplicate member:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Fails to add member to non-existent organization", async () => {
-      try {
-        await program.methods
-          .addMember("NonExistentOrg", newMember.publicKey)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on non-existent organization:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Fails to add member when not a member", async () => {
-      const nonMember = createWallet();
-      await airdrop(nonMember, 1);
-
-      try {
-        await program.methods
-          .addMember(testOrgName, newMember.publicKey)
-          .accounts({
-            programData: programDataPDA,
-            creator: nonMember.publicKey,
-          })
-          .signers([nonMember])
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on unauthorized member addition:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
+      expect.fail("Should have thrown an error");
+    } catch (err) {
+      expect(err.toString()).to.include("ClaimAlreadyExists");
+    }
   });
 
-  describe("Claim Management", () => {
-    it("Adds claim successfully", async () => {
-      const tx = await program.methods
-        .addClaim(testOrgName, testClaimId, testJsonUrl, testDataHash)
+  it("Prevents unauthorized operations", async () => {
+    try {
+      // Try to add claim with unauthorized account
+      await program.methods
+        .addClaim(testClaimId, testJsonUrl, testDataHash)
         .accounts({
-          programData: programDataPDA,
-          creator: wallet.publicKey,
+          programData: programDataPda,
+          creator: unauthorized.publicKey,
         })
+        .signers([unauthorized])
         .rpc();
+      expect.fail("Should have thrown an error");
+    } catch (err) {
+      expect(err.toString()).to.include("Unauthorized");
+    }
+  });
 
-      // console.log("Add claim transaction:", tx);
-      const programData = await program.account.programData.fetch(programDataPDA);
-      // console.log("Program data after adding claim:", programData);
-      const org = programData.organizations.find(o => o.name === testOrgName);
-      // console.log("Organization claims:", org.claims);
-      // console.log("First claim:", org.claims[0]);
-      // console.log("Created at type:", typeof org.claims[0].createdAt);
-      // console.log("Created at value:", org.claims[0].createdAt);
-      expect(org.claims).to.have.lengthOf(1);
-      expect(org.claims[0].claimId).to.equal(testClaimId);
-      expect(org.claims[0].jsonUrl).to.equal(testJsonUrl);
-      expect(org.claims[0].dataHash).to.deep.equal(testDataHash);
-      expect(org.claims[0].creator.equals(wallet.publicKey)).to.be.true;
-      expect(org.claims[0].createdAt.toNumber()).to.be.a("number");
-    });
+  it("Transfers ownership", async () => {
+    // Initiate ownership transfer
+    await program.methods
+      .transferOwnership(newOwner.publicKey)
+      .accounts({
+        programData: programDataPda,
+        owner: owner.publicKey,
+      })
+      .signers([owner])
+      .rpc();
 
-    it("Fails to add claim with duplicate ID", async () => {
-      try {
-        await program.methods
-          .addClaim(testOrgName, testClaimId, testJsonUrl, testDataHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on duplicate claim:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
+    // Verify pending owner
+    let programData = await program.account.programData.fetch(programDataPda);
+    expect(programData.pendingOwner.toString()).to.equal(newOwner.publicKey.toString());
 
-    it("Fails to add claim to non-existent organization", async () => {
-      try {
-        await program.methods
-          .addClaim("NonExistentOrg", testClaimId, testJsonUrl, testDataHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on non-existent organization:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
+    // Accept ownership
+    await program.methods
+      .acceptOwnership()
+      .accounts({
+        programData: programDataPda,
+        newOwner: newOwner.publicKey,
+      })
+      .signers([newOwner])
+      .rpc();
 
-    it("Fails to add claim when not a member", async () => {
-      const nonMember = createWallet();
-      await airdrop(nonMember, 1);
+    // Verify new owner
+    programData = await program.account.programData.fetch(programDataPda);
+    expect(programData.owner.toString()).to.equal(newOwner.publicKey.toString());
+    expect(programData.pendingOwner).to.be.null;
+  });
 
-      try {
-        await program.methods
-          .addClaim(testOrgName, "claim-2", testJsonUrl, testDataHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: nonMember.publicKey,
-          })
-          .signers([nonMember])
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on unauthorized claim addition:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
+  it("Renounces ownership", async () => {
+    // Renounce ownership
+    await program.methods
+      .renounceOwnership()
+      .accounts({
+        programData: programDataPda,
+        owner: newOwner.publicKey,
+      })
+      .signers([newOwner])
+      .rpc();
 
-    it("Adds multiple claims successfully", async () => {
-      const claims = [
-        { id: "claim-2", url: "https://example.com/claim2.json" },
-        { id: "claim-3", url: "https://example.com/claim3.json" },
-      ];
-
-      for (const claim of claims) {
-        const tx = await program.methods
-          .addClaim(testOrgName, claim.id, claim.url, testDataHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        // console.log(`Add claim ${claim.id} transaction:`, tx);
-      }
-
-      const programData = await program.account.programData.fetch(programDataPDA);
-      // console.log("Program data after adding multiple claims:", programData);
-      const org = programData.organizations.find(o => o.name === testOrgName);
-      // console.log("Organization claims:", org.claims);
-      expect(org.claims).to.have.lengthOf(3);
-      expect(org.claims.map(c => c.claimId)).to.include.members(claims.map(c => c.id));
-    });
-
-    it("Fails to add claim with empty ID", async () => {
-      try {
-        await program.methods
-          .addClaim(testOrgName, "", testJsonUrl, testDataHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on empty claim ID:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Fails to add claim with empty URL", async () => {
-      try {
-        await program.methods
-          .addClaim(testOrgName, "claim-4", "", testDataHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on empty URL:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Fails to add claim with invalid data hash length", async () => {
-      const invalidHash = Array.from(new Uint8Array(16)); // Should be 32 bytes
-      try {
-        await program.methods
-          .addClaim(testOrgName, "claim-4", testJsonUrl, invalidHash)
-          .accounts({
-            programData: programDataPDA,
-            creator: wallet.publicKey,
-          })
-          .rpc();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        // console.log("Expected error on invalid hash length:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Retrieves claims successfully for organization member", async () => {
-      const claims = await program.methods
-        .getClaims(testOrgName)
-        .accounts({
-          programData: programDataPDA,
-          requester: wallet.publicKey,
-        })
-        .view();
-
-      console.log("Retrieved claims:", claims);
-      expect(claims).to.be.an("array");
-      expect(claims).to.have.lengthOf(3); // We added 3 claims in previous tests
-      expect(claims[0].claimId).to.equal(testClaimId);
-      expect(claims[0].jsonUrl).to.equal(testJsonUrl);
-      expect(claims[0].dataHash).to.deep.equal(testDataHash);
-      expect(claims[0].creator.equals(wallet.publicKey)).to.be.true;
-      expect(claims[0].createdAt.toNumber()).to.be.a("number");
-    });
-
-    it("Fails to retrieve claims for non-member", async () => {
-      const nonMember = createWallet();
-      await airdrop(nonMember, 1);
-
-      try {
-        await program.methods
-          .getClaims(testOrgName)
-          .accounts({
-            programData: programDataPDA,
-            requester: nonMember.publicKey,
-          })
-          .view();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        console.log("Expected error on unauthorized claim retrieval:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
-
-    it("Fails to retrieve claims for non-existent organization", async () => {
-      try {
-        await program.methods
-          .getClaims("NonExistentOrg")
-          .accounts({
-            programData: programDataPDA,
-            requester: wallet.publicKey,
-          })
-          .view();
-        expect.fail("Should have thrown an error");
-      } catch (err) {
-        console.log("Expected error on non-existent organization:", err);
-        expect(err).to.be.instanceOf(Error);
-      }
-    });
+    // Verify zero address owner
+    const programData = await program.account.programData.fetch(programDataPda);
+    expect(programData.owner.toString()).to.equal(PublicKey.default.toString());
   });
 });

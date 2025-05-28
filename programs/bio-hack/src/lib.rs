@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
+use anchor_lang::solana_program::program::invoke_signed;
 
 declare_id!("DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9");
 
@@ -6,55 +8,52 @@ declare_id!("DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9");
 pub mod bio_hack {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, initial_owner: Option<Pubkey>) -> Result<()> {
         let program_data = &mut ctx.accounts.program_data;
-        program_data.organizations = vec![];
+        program_data.claims = vec![];
+        program_data.owner = initial_owner.unwrap_or(*ctx.accounts.creator.key);
+        program_data.pending_owner = None;
         Ok(())
     }
 
-    pub fn create_organization(ctx: Context<CreateOrganization>, name: String) -> Result<()> {
-        require!(!name.is_empty(), ErrorCode::InvalidOrganizationName);
+    pub fn transfer_ownership(ctx: Context<TransferOwnership>, new_owner: Pubkey) -> Result<()> {
         let program_data = &mut ctx.accounts.program_data;
         require!(
-            !program_data.organizations.iter().any(|org| org.name == name),
-            ErrorCode::OrganizationAlreadyExists
-        );
-        
-        program_data.organizations.push(Organization {
-            creator: *ctx.accounts.creator.key,
-            name,
-            members: vec![*ctx.accounts.creator.key], // Creator is first member
-            claims: vec![],
-        });
-        Ok(())
-    }
-
-    pub fn add_member(
-        ctx: Context<AddMember>,
-        organization_name: String,
-        new_member: Pubkey,
-    ) -> Result<()> {
-        let program_data = &mut ctx.accounts.program_data;
-        let organization = program_data.organizations
-            .iter_mut()
-            .find(|org| org.name == organization_name)
-            .ok_or(ErrorCode::OrganizationNotFound)?;
-
-        require!(
-            organization.members.contains(ctx.accounts.creator.key),
+            program_data.owner == *ctx.accounts.owner.key,
             ErrorCode::Unauthorized
         );
+        require!(new_owner != program_data.owner, ErrorCode::InvalidNewOwner);
+        
+        program_data.pending_owner = Some(new_owner);
+        Ok(())
+    }
+
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
+        let program_data = &mut ctx.accounts.program_data;
         require!(
-            !organization.members.contains(&new_member),
-            ErrorCode::MemberAlreadyExists
+            program_data.pending_owner == Some(*ctx.accounts.new_owner.key),
+            ErrorCode::NoPendingOwnershipTransfer
         );
-        organization.members.push(new_member);
+        
+        program_data.owner = *ctx.accounts.new_owner.key;
+        program_data.pending_owner = None;
+        Ok(())
+    }
+
+    pub fn renounce_ownership(ctx: Context<RenounceOwnership>) -> Result<()> {
+        let program_data = &mut ctx.accounts.program_data;
+        require!(
+            program_data.owner == *ctx.accounts.owner.key,
+            ErrorCode::Unauthorized
+        );
+        
+        program_data.owner = Pubkey::default();
+        program_data.pending_owner = None;
         Ok(())
     }
 
     pub fn add_claim(
         ctx: Context<AddClaim>,
-        organization_name: String,
         claim_id: String,
         json_url: String,
         data_hash: [u8; 32],
@@ -63,22 +62,20 @@ pub mod bio_hack {
         require!(!json_url.is_empty(), ErrorCode::InvalidJsonUrl);
         
         let program_data = &mut ctx.accounts.program_data;
-        let organization = program_data.organizations
-            .iter_mut()
-            .find(|org| org.name == organization_name)
-            .ok_or(ErrorCode::OrganizationNotFound)?;
-
         require!(
-            organization.members.contains(ctx.accounts.creator.key),
+            program_data.owner == *ctx.accounts.creator.key,
             ErrorCode::Unauthorized
         );
+
+        let hashed_claim_id = hash(claim_id.as_bytes()).to_bytes();
+        
         require!(
-            !organization.claims.iter().any(|c| c.claim_id == claim_id),
+            !program_data.claims.iter().any(|c| c.claim_id_hash == hashed_claim_id),
             ErrorCode::ClaimAlreadyExists
         );
         
-        organization.claims.push(Claim {
-            claim_id,
+        program_data.claims.push(Claim {
+            claim_id_hash: hashed_claim_id,
             json_url,
             data_hash,
             creator: *ctx.accounts.creator.key,
@@ -87,22 +84,13 @@ pub mod bio_hack {
         Ok(())
     }
 
-    pub fn get_claims(
-        ctx: Context<GetClaims>,
-        organization_name: String,
-    ) -> Result<Vec<Claim>> {
+    pub fn get_claims(ctx: Context<GetClaims>) -> Result<Vec<Claim>> {
         let program_data = &ctx.accounts.program_data;
-        let organization = program_data.organizations
-            .iter()
-            .find(|org| org.name == organization_name)
-            .ok_or(ErrorCode::OrganizationNotFound)?;
-
         require!(
-            organization.members.contains(ctx.accounts.requester.key),
+            program_data.owner == *ctx.accounts.requester.key,
             ErrorCode::Unauthorized
         );
-
-        Ok(organization.claims.clone())
+        Ok(program_data.claims.clone())
     }
 }
 
@@ -111,7 +99,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = creator,
-        space = 8 + 4 + 10000, // Space for program data and organizations
+        space = 8 + 32 + 32 + 4 + 10000, // Space for program data, owner pubkey, pending_owner, and claims
         seeds = [b"program_data"],
         bump
     )]
@@ -122,19 +110,27 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CreateOrganization<'info> {
+pub struct TransferOwnership<'info> {
     #[account(mut)]
     pub program_data: Account<'info, ProgramData>,
     #[account(mut)]
-    pub creator: Signer<'info>,
+    pub owner: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct AddMember<'info> {
+pub struct AcceptOwnership<'info> {
     #[account(mut)]
     pub program_data: Account<'info, ProgramData>,
     #[account(mut)]
-    pub creator: Signer<'info>,
+    pub new_owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RenounceOwnership<'info> {
+    #[account(mut)]
+    pub program_data: Account<'info, ProgramData>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -148,26 +144,20 @@ pub struct AddClaim<'info> {
 #[derive(Accounts)]
 pub struct GetClaims<'info> {
     pub program_data: Account<'info, ProgramData>,
-    /// CHECK: This is the account requesting the claims
-    pub requester: AccountInfo<'info>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
 }
 
 #[account]
 pub struct ProgramData {
-    pub organizations: Vec<Organization>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Organization {
-    pub creator: Pubkey,
-    pub name: String,
-    pub members: Vec<Pubkey>,
+    pub owner: Pubkey,
+    pub pending_owner: Option<Pubkey>,
     pub claims: Vec<Claim>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Claim {
-    pub claim_id: String,
+    pub claim_id_hash: [u8; 32],
     pub json_url: String,
     pub data_hash: [u8; 32],
     pub creator: Pubkey,
@@ -176,20 +166,16 @@ pub struct Claim {
 
 #[error_code]
 pub enum ErrorCode {
-    #[msg("Only organization members can perform this action")]
+    #[msg("Only the owner can perform this action")]
     Unauthorized,
-    #[msg("Member already exists in the organization")]
-    MemberAlreadyExists,
     #[msg("Claim with this ID already exists")]
     ClaimAlreadyExists,
-    #[msg("Organization not found")]
-    OrganizationNotFound,
-    #[msg("Organization with this name already exists")]
-    OrganizationAlreadyExists,
-    #[msg("Organization name cannot be empty")]
-    InvalidOrganizationName,
     #[msg("Claim ID cannot be empty")]
     InvalidClaimId,
     #[msg("JSON URL cannot be empty")]
     InvalidJsonUrl,
+    #[msg("Invalid new owner address")]
+    InvalidNewOwner,
+    #[msg("No pending ownership transfer")]
+    NoPendingOwnershipTransfer,
 }

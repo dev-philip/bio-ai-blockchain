@@ -1,0 +1,4 @@
+anchorpy-fork==0.23.2
+solders==0.23.0
+python-dotenv==1.0.1
+httpx==0.26.0

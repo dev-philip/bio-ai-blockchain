@@ -1,159 +1,117 @@
-# Bio-Hack
+## Features
 
-A Solana program for managing organizations, their members, and claims using a single program account.
+- **Claim Management**: Add and retrieve biological claims with associated metadata
+- **Ownership Control**: Secure ownership transfer and management
+- **Data Verification**: Cryptographic verification of claim data
+- **Access Control**: Role-based access control for claim management
 
-## Program Overview
+## Prerequisites
 
-This program provides functionality to:
-- Create organizations
-- Manage organization membership
-- Add claims to organizations
-- Retrieve claims from organizations (members only)
+- [Rust](https://www.rust-lang.org/tools/install)
+- [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools)
+- [Anchor Framework](https://www.anchor-lang.com/docs/installation)
+- [Node.js](https://nodejs.org/) (for testing)
 
-## Deployment Information
-
-- **Program ID**: `DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9`
-- **Network**: Solana Devnet
-- **Explorer Links**:
-  - [Program on Solana Explorer](https://explorer.solana.com/address/DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9?cluster=devnet)
-  - [Program Data Account](https://explorer.solana.com/address/F6u6fAKhhChncGSh5B8ZygM9197iwaEZcvXP6s3BDFWU?cluster=devnet)
+#
 
 ## Program Structure
 
-The program uses a single program account to store all data:
+### Accounts
 
-```rust
-#[account]
-pub struct ProgramData {
-    pub organizations: Vec<Organization>,
-}
+- `ProgramData`: Main program account storing:
+  - Owner address
+  - Pending owner (for ownership transfers)
+  - Claims vector
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Organization {
-    pub creator: Pubkey,
-    pub name: String,
-    pub members: Vec<Pubkey>,
-    pub claims: Vec<Claim>,
-}
+### Instructions
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Claim {
-    pub claim_id: String,
-    pub json_url: String,
-    pub data_hash: [u8; 32],
-    pub creator: Pubkey,
-    pub created_at: i64,
-}
-```
+1. `initialize(initial_owner: Option<Pubkey>)`
+   - Initializes the program
+   - Sets the initial owner (defaults to creator if not specified)
 
-## Instructions
+2. `add_claim(claim_id: String, json_url: String, data_hash: [u8; 32])`
+   - Adds a new biological claim
+   - Requires owner authorization
+   - Prevents duplicate claims
 
-### Initialize Program
-Initializes the program data account that will store all organizations and their data.
+3. `get_claims()`
+   - Retrieves all claims
+   - Requires owner authorization
 
-### Create Organization
-Creates a new organization with the creator as the first member.
+4. `transfer_ownership(new_owner: Pubkey)`
+   - Initiates ownership transfer
+   - Requires current owner authorization
 
-### Add Member
-Allows existing organization members to add new members.
+5. `accept_ownership()`
+   - Accepts pending ownership transfer
+   - Requires new owner authorization
 
-### Add Claim
-Allows organization members to add claims to their organization.
-
-### Get Claims
-Retrieves all claims for an organization. Only organization members can access the claims.
-
-## Error Handling
-
-The program includes comprehensive error handling for various scenarios:
-- Unauthorized access attempts
-- Duplicate member additions
-- Duplicate claim IDs
-- Organization not found
-- Duplicate organization names
-- Invalid organization names
+6. `renounce_ownership()`
+   - Renounces program ownership
+   - Sets owner to default address
 
 ## Testing
 
-The program includes extensive tests covering:
+Run the test suite:
+```bash
+anchor test
+```
+
+The test suite covers:
 - Program initialization
-- Organization creation and management
-- Member management
 - Claim management
-- Error cases and edge conditions
-- Claim retrieval authorization
+- Ownership transfers
+- Access control
+- Error handling
 
-## Security Considerations
+## Usage Example
 
-- Member-based access control
-- Unique member public keys
-- Claim validation
-- Organization name validation
-- Protected claim retrieval
+```typescript
+// Initialize program with custom owner
+await program.methods
+  .initialize(myAddress)
+  .accounts({
+    programData: programDataPda,
+    creator: creator.publicKey,
+    systemProgram: SystemProgram.programId,
+  })
+  .signers([creator])
+  .rpc();
 
-## Limitations
+// Add a claim
+await program.methods
+  .addClaim(
+    "claim_id",
+    "https://example.com/claim.json",
+    dataHash
+  )
+  .accounts({
+    programData: programDataPda,
+    creator: owner.publicKey,
+  })
+  .signers([owner])
+  .rpc();
+```
 
-- No update functionality for organizations
-- No deletion functionality
-- No member removal functionality
-- Fixed initial capacity for members and claims
+## Security
 
-## Future Improvements
-
-- Add member removal functionality
-- Implement different member roles
-- Add claim update and deletion
-- Add organization update functionality
-- Implement dynamic capacity for members and claims
-- Add pagination for claim retrieval
-- Add claim filtering options
-
-## Getting Started
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   yarn install
-   ```
-3. Build the program:
-   ```bash
-   anchor build
-   ```
-4. Run tests:
-   ```bash
-   anchor test
-   ```
-
-## Interacting with the Program
-
-To interact with the deployed program on devnet:
-
-1. Set up your Solana configuration:
-   ```bash
-   solana config set --url devnet
-   ```
-
-2. Get some devnet SOL:
-   ```bash
-   solana airdrop 2
-   ```
-
-3. Use the program ID in your client code:
-   ```typescript
-   const programId = new PublicKey("DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9");
-   ```
-
-4. Example of retrieving claims:
-   ```typescript
-   const claims = await program.methods
-     .getClaims(organizationName)
-     .accounts({
-       programData: programDataPDA,
-       requester: wallet.publicKey,
-     })
-     .view();
-   ```
+- All operations require proper authorization
+- Ownership transfers use a two-step process
+- Claim data is verified using cryptographic hashes
+- Duplicate claims are prevented
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Contact
+
+For questions or support, please open an issue in the GitHub repository.
