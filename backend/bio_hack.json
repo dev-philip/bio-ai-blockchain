@@ -1,8 +1,8 @@
 {
   "address": "DV88SqFNjehQYUdgezSEYK5Hp4xgx54s7Na4jpmBYKJ9",
+  "version": "0.1.0",
   "metadata": {
     "name": "bio_hack",
-    "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
